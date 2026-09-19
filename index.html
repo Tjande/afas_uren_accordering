@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OutSite - Uren Accorderen per Medewerker</title>
+  <style>
+    :root {
+      --afas-blue: #00509d;
+      --afas-light-blue: #e8f1f9;
+      --bg-gray: #f8fafc;
+      --border-color: #e2e8f0;
+      --text-dark: #1e293b;
+      --green: #10b981;
+      --red: #ef4444;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-gray);
+      color: var(--text-dark);
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid var(--afas-light-blue);
+      padding-bottom: 16px;
+      margin-bottom: 24px;
+    }
+
+    .header h2 {
+      margin: 0;
+      color: var(--afas-blue);
+    }
+
+    .filter-bar {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      background: var(--afas-light-blue);
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+    }
+
+    .filter-bar label {
+      font-weight: bold;
+      color: var(--afas-blue);
+    }
+
+    .filter-bar input[type="month"] {
+      padding: 8px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    /* Accordion / Medewerker kaart */
+    .employee-card {
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+
+    .employee-header {
+      background: #ffffff;
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.2s;
+    }
+
+    .employee-header:hover {
+      background: var(--afas-light-blue);
+    }
+
+    .employee-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .avatar {
+      width: 40px;
+      height: 40px;
+      background: var(--afas-blue);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+    }
+
+    .employee-details h3 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    .employee-details span {
+      font-size: 13px;
+      color: #64748b;
+    }
+
+    .employee-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn {
+      padding: 8px 14px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+      transition: opacity 0.2s;
+    }
+
+    .btn:hover { opacity: 0.85; }
+    .btn-success { background: var(--green); color: white; }
+    .btn-danger { background: var(--red); color: white; }
+    .btn-outline { background: transparent; border: 1px solid var(--border-color); }
+
+    /* Urentabel */
+    .table-container {
+      display: none;
+      border-top: 1px solid var(--border-color);
+      background: #fafafa;
+    }
+
+    .table-container.open { display: block; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 14px;
+    }
+
+    th, td {
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    th {
+      background: #f1f5f9;
+      color: #475569;
+      font-weight: 600;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .badge-pending { background: #fef3c7; color: #92400e; }
+    .badge-approved { background: #d1fae5; color: #065f46; }
+
+    /* Modal for Rejection Reason */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5);
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-content {
+      background: white;
+      padding: 24px;
+      border-radius: 8px;
+      width: 400px;
+      max-width: 90%;
+    }
+
+    .modal-content textarea {
+      width: 100%;
+      height: 80px;
+      margin: 12px 0;
+      padding: 8px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <h2>Urenaccordering OutSite</h2>
+    <span id="klantNaam" style="font-weight: 600; color: #64748b;">Klant ID: ...</span>
+  </div>
+
+  <!-- Maandfilter -->
+  <div class="filter-bar">
+    <label for="monthPicker">Selecteer Periode (Maand):</label>
+    <input type="month" id="monthPicker" onchange="loadHours()">
+  </div>
+
+  <!-- Medewerkers Lijst -->
+  <div id="employeeList">
+    <p style="text-align:center; color: #64748b;">Uren laden...</p>
+  </div>
+</div>
+
+<!-- Modal voor Afkeurreden -->
+<div class="modal" id="rejectModal">
+  <div class="modal-content">
+    <h3>Reden van afkeuring</h3>
+    <p style="font-size: 13px; color: #64748b;">Geef een toelichting voor de medewerker waarom deze uren worden afgekeurd:</p>
+    <textarea id="rejectReason" placeholder="Bijv. Verkeerde projectcode gekozen..."></textarea>
+    <div style="display:flex; justify-content:flex-end; gap:8px;">
+      <button class="btn btn-outline" onclick="closeModal()">Annuleren</button>
+      <button class="btn btn-danger" onclick="confirmReject()">Afkeuren Bevestigen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // VERVANG DEZE URL'S MET JOUW EIGEN HUBBI WEBHOOK URL'S
+  const HUBBI_GET_URL = "https://jouw-hubbi-omgeving.nl/api/get-hours";
+  const HUBBI_POST_URL = "https://jouw-hubbi-omgeving.nl/api/approve-hours";
+
+  let selectedRuleId = null;
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const today = new Date();
+    const currentMonth = today.toISOString().substring(0, 7); // YYYY-MM
+    document.getElementById("monthPicker").value = currentMonth;
+    
+    loadHours();
+  });
+
+  function getDebiteurId() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('debituurId') || '10023';
+  }
+
+  async function loadHours() {
+    const debituurId = getDebiteurId();
+    const month = document.getElementById("monthPicker").value;
+    const container = document.getElementById("employeeList");
+    
+    document.getElementById("klantNaam").innerText = `Debiteurnummer: ${debituurId}`;
+    container.innerHTML = `<p style="text-align:center; color: #64748b;">Uren ophalen voor ${month}...</p>`;
+
+    try {
+      const response = await fetch(`${HUBBI_GET_URL}?debituurId=${debituurId}&month=${month}`);
+      const data = await response.json();
+
+      if (!data || data.length === 0) {
+        container.innerHTML = `<p style="text-align:center; padding: 20px; color: #64748b;">Geen openstaande uren gevonden voor deze maand.</p>`;
+        return;
+      }
+
+      renderEmployees(data);
+    } catch (err) {
+      console.error(err);
+      container.innerHTML = `<p style="text-align:center; color: red;">Fout bij het laden van uren via HubBI.</p>`;
+    }
+  }
+
+  function renderEmployees(employees) {
+    const container = document.getElementById("employeeList");
+    container.innerHTML = "";
+
+    employees.forEach((emp, index) => {
+      const initials = emp.employeeName.split(' ').map(n => n[0]).join('').substring(0, 2);
+      
+      const card = document.createElement("div");
+      card.className = "employee-card";
+      card.innerHTML = `
+        <div class="employee-header" onclick="toggleTable(${index})">
+          <div class="employee-info">
+            <div class="avatar">${initials}</div>
+            <div class="employee-details">
+              <h3>${emp.employeeName}</h3>
+              <span>${emp.rules.length} urenregels in deze maand</span>
+            </div>
+          </div>
+          <div class="employee-actions" onclick="event.stopPropagation()">
+            <span style="font-weight: bold; font-size: 16px; margin-right: 12px;">${emp.totalHours.toFixed(1)} uur</span>
+            <button class="btn btn-success" onclick="approveAll('${emp.employeeId}', ${index})">Accordeer alles van ${emp.employeeName.split(' ')[0]}</button>
+          </div>
+        </div>
+        
+        <div class="table-container" id="table-${index}">
+          <table>
+            <thead>
+              <tr>
+                <th>Datum</th>
+                <th>Project</th>
+                <th>Werkzaamheid</th>
+                <th>Omschrijving</th>
+                <th>Uren</th>
+                <th>Status</th>
+                <th>Acties</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${emp.rules.map(rule => `
+                <tr id="row-${rule.ruleId}">
+                  <td>${rule.date}</td>
+                  <td>${rule.project}</td>
+                  <td>${rule.workType}</td>
+                  <td>${rule.description}</td>
+                  <td><strong>${rule.hours}</strong></td>
+                  <td><span class="status-badge badge-pending">${rule.status}</span></td>
+                  <td>
+                    <button class="btn btn-success" style="padding: 4px 8px;" onclick="updateSingleRule('${rule.ruleId}', 'approve')">✓</button>
+                    <button class="btn btn-danger" style="padding: 4px 8px;" onclick="openRejectModal('${rule.ruleId}')">✕</button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  function toggleTable(index) {
+    const table = document.getElementById(`table-${index}`);
+    table.classList.toggle("open");
+  }
+
+  async function updateSingleRule(ruleId, action, reason = "") {
+    try {
+      const res = await fetch(HUBBI_POST_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ruleId, action, reason })
+      });
+      
+      if (res.ok) {
+        const row = document.getElementById(`row-${ruleId}`);
+        if (action === 'approve') {
+          row.querySelector('.status-badge').className = 'status-badge badge-approved';
+          row.querySelector('.status-badge').innerText = 'Geaccordeerd';
+        } else {
+          row.style.opacity = '0.4';
+          row.querySelector('.status-badge').innerText = 'Afgekeurd';
+        }
+      }
+    } catch (e) {
+      alert("Er is een fout opgetreden bij het verwerken.");
+    }
+  }
+
+  async function approveAll(employeeId, tableIndex) {
+    const table = document.getElementById(`table-${tableIndex}`);
+    const rows = table.querySelectorAll("tbody tr");
+    
+    for (let row of rows) {
+      const ruleId = row.id.replace('row-', '');
+      await updateSingleRule(ruleId, 'approve');
+    }
+  }
+
+  function openRejectModal(ruleId) {
+    selectedRuleId = ruleId;
+    document.getElementById("rejectModal").style.display = "flex";
+  }
+
+  function closeModal() {
+    document.getElementById("rejectModal").style.display = "none";
+    document.getElementById("rejectReason").value = "";
+  }
+
+  function confirmReject() {
+    const reason = document.getElementById("rejectReason").value;
+    if (!reason) {
+      alert("Vul a.u.b. een reden in.");
+      return;
+    }
+    updateSingleRule(selectedRuleId, 'reject', reason);
+    closeModal();
+  }
+</script>
+
+</body>
+</html>
