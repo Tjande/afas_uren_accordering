@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OutSite - Uren Accorderen per Medewerker</title>
+  <title>OutSite - Uren Accorderen</title>
   <style>
     :root {
       --afas-blue: #00509d;
@@ -11,8 +11,9 @@
       --bg-gray: #f8fafc;
       --border-color: #e2e8f0;
       --text-dark: #1e293b;
-      --green: #10b981;
-      --red: #ef4444;
+      --text-muted: #64748b;
+      --orange: #e8890c;
+      --orange-dark: #cc7a0a;
     }
 
     body {
@@ -24,7 +25,7 @@
     }
 
     .container {
-      max-width: 1000px;
+      max-width: 1100px;
       margin: 0 auto;
       background: #ffffff;
       padding: 24px;
@@ -38,22 +39,25 @@
       align-items: center;
       border-bottom: 2px solid var(--afas-light-blue);
       padding-bottom: 16px;
-      margin-bottom: 24px;
+      margin-bottom: 16px;
     }
 
     .header h2 {
       margin: 0;
       color: var(--afas-blue);
+      font-size: 20px;
     }
 
+    /* Maandfilter */
     .filter-bar {
       display: flex;
       gap: 16px;
       align-items: center;
       background: var(--afas-light-blue);
-      padding: 12px 16px;
+      padding: 10px 16px;
       border-radius: 8px;
-      margin-bottom: 24px;
+      margin-bottom: 16px;
+      font-size: 14px;
     }
 
     .filter-bar label {
@@ -62,92 +66,37 @@
     }
 
     .filter-bar input[type="month"] {
-      padding: 8px 12px;
+      padding: 6px 10px;
       border: 1px solid var(--border-color);
       border-radius: 6px;
       font-size: 14px;
     }
 
-    /* Accordion / Medewerker kaart */
-    .employee-card {
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      margin-bottom: 16px;
-      overflow: hidden;
-    }
-
-    .employee-header {
-      background: #ffffff;
-      padding: 16px 20px;
+    /* Toolbar: entries + search */
+    .toolbar {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      cursor: pointer;
-      user-select: none;
-      transition: background 0.2s;
-    }
-
-    .employee-header:hover {
-      background: var(--afas-light-blue);
-    }
-
-    .employee-info {
-      display: flex;
-      align-items: center;
+      flex-wrap: wrap;
       gap: 12px;
+      margin-bottom: 12px;
+      font-size: 14px;
+      color: var(--text-muted);
     }
 
-    .avatar {
-      width: 40px;
-      height: 40px;
-      background: var(--afas-blue);
-      color: white;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-    }
-
-    .employee-details h3 {
-      margin: 0;
-      font-size: 16px;
-    }
-
-    .employee-details span {
-      font-size: 13px;
-      color: #64748b;
-    }
-
-    .employee-actions {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .btn {
-      padding: 8px 14px;
-      border: none;
+    .toolbar select,
+    .toolbar input[type="text"] {
+      padding: 6px 10px;
+      border: 1px solid var(--border-color);
       border-radius: 6px;
-      cursor: pointer;
-      font-weight: 600;
-      font-size: 13px;
-      transition: opacity 0.2s;
+      font-size: 14px;
     }
 
-    .btn:hover { opacity: 0.85; }
-    .btn-success { background: var(--green); color: white; }
-    .btn-danger { background: var(--red); color: white; }
-    .btn-outline { background: transparent; border: 1px solid var(--border-color); }
-
-    /* Urentabel */
-    .table-container {
-      display: none;
-      border-top: 1px solid var(--border-color);
-      background: #fafafa;
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
     }
-
-    .table-container.open { display: block; }
 
     table {
       width: 100%;
@@ -157,52 +106,137 @@
     }
 
     th, td {
-      padding: 12px 20px;
+      padding: 10px 16px;
       border-bottom: 1px solid var(--border-color);
+      white-space: nowrap;
+    }
+
+    td.wrap-cell {
+      white-space: normal;
     }
 
     th {
       background: #f1f5f9;
       color: #475569;
       font-weight: 600;
+      user-select: none;
     }
 
-    .status-badge {
-      display: inline-block;
-      padding: 4px 8px;
-      border-radius: 12px;
-      font-size: 12px;
-      font-weight: bold;
+    th.sortable {
+      cursor: pointer;
     }
 
-    .badge-pending { background: #fef3c7; color: #92400e; }
-    .badge-approved { background: #d1fae5; color: #065f46; }
-
-    /* Modal for Rejection Reason */
-    .modal {
-      display: none;
-      position: fixed;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.5);
-      justify-content: center;
-      align-items: center;
+    th.sortable:hover {
+      background: #e8edf3;
     }
 
-    .modal-content {
-      background: white;
+    .sort-arrows {
+      display: inline-flex;
+      flex-direction: column;
+      margin-left: 4px;
+      vertical-align: middle;
+      font-size: 8px;
+      line-height: 8px;
+      color: #b6c0cc;
+    }
+
+    .sort-arrows span.active {
+      color: var(--afas-blue);
+    }
+
+    th.col-check, td.col-check {
+      width: 36px;
+      text-align: center;
+    }
+
+    tbody tr:hover {
+      background: #fafbfc;
+    }
+
+    tbody tr.no-results td {
+      text-align: center;
+      color: var(--text-muted);
       padding: 24px;
-      border-radius: 8px;
-      width: 400px;
-      max-width: 90%;
     }
 
-    .modal-content textarea {
-      width: 100%;
-      height: 80px;
-      margin: 12px 0;
-      padding: 8px;
+    input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+
+    /* Footer: entries info + pagination */
+    .table-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .pagination {
+      display: flex;
+      gap: 4px;
+    }
+
+    .pagination button {
+      min-width: 32px;
+      height: 32px;
       border: 1px solid var(--border-color);
-      border-radius: 4px;
+      background: white;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--text-dark);
+    }
+
+    .pagination button:hover:not(:disabled):not(.active) {
+      background: var(--afas-light-blue);
+    }
+
+    .pagination button.active {
+      background: var(--orange);
+      border-color: var(--orange);
+      color: white;
+      font-weight: 600;
+    }
+
+    .pagination button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .pagination span.ellipsis {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 24px;
+      color: var(--text-muted);
+    }
+
+    .btn-verzenden {
+      margin-top: 20px;
+      background: var(--orange);
+      color: white;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+    }
+
+    .btn-verzenden:hover:not(:disabled) {
+      background: var(--orange-dark);
+    }
+
+    .btn-verzenden:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
   </style>
 </head>
@@ -210,8 +244,8 @@
 
 <div class="container">
   <div class="header">
-    <h2>Urenaccordering OutSite</h2>
-    <span id="klantNaam" style="font-weight: 600; color: #64748b;">Klant ID: ...</span>
+    <h2>&#9998; Uren accorderen &amp; gereed melden</h2>
+    <span id="klantNaam" style="font-weight: 600; color: #64748b; font-size: 13px;">Klant ID: ...</span>
   </div>
 
   <!-- Maandfilter -->
@@ -220,23 +254,51 @@
     <input type="month" id="monthPicker" onchange="loadHours()">
   </div>
 
-  <!-- Medewerkers Lijst -->
-  <div id="employeeList">
-    <p style="text-align:center; color: #64748b;">Uren laden...</p>
-  </div>
-</div>
-
-<!-- Modal voor Afkeurreden -->
-<div class="modal" id="rejectModal">
-  <div class="modal-content">
-    <h3>Reden van afkeuring</h3>
-    <p style="font-size: 13px; color: #64748b;">Geef een toelichting voor de medewerker waarom deze uren worden afgekeurd:</p>
-    <textarea id="rejectReason" placeholder="Bijv. Verkeerde projectcode gekozen..."></textarea>
-    <div style="display:flex; justify-content:flex-end; gap:8px;">
-      <button class="btn btn-outline" onclick="closeModal()">Annuleren</button>
-      <button class="btn btn-danger" onclick="confirmReject()">Afkeuren Bevestigen</button>
+  <!-- Entries + Search -->
+  <div class="toolbar">
+    <div class="toolbar-left">
+      Show
+      <select id="pageSizeSelect" onchange="onPageSizeChange()">
+        <option value="10">10</option>
+        <option value="25">25</option>
+        <option value="50">50</option>
+        <option value="100">100</option>
+      </select>
+      entries
+    </div>
+    <div class="toolbar-right">
+      Search:
+      <input type="text" id="searchInput" oninput="onSearchInput()" placeholder="">
     </div>
   </div>
+
+  <!-- Urentabel -->
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="col-check"><input type="checkbox" id="selectAllCheckbox" onchange="onSelectAllChange()"></th>
+          <th class="sortable" data-col="date" onclick="onSortClick('date')">Datum<span class="sort-arrows" data-col="date"><span data-dir="asc">&#9650;</span><span data-dir="desc">&#9660;</span></span></th>
+          <th class="sortable" data-col="employeeName" onclick="onSortClick('employeeName')">Medewerker<span class="sort-arrows" data-col="employeeName"><span data-dir="asc">&#9650;</span><span data-dir="desc">&#9660;</span></span></th>
+          <th class="sortable" data-col="project" onclick="onSortClick('project')">Project<span class="sort-arrows" data-col="project"><span data-dir="asc">&#9650;</span><span data-dir="desc">&#9660;</span></span></th>
+          <th class="sortable" data-col="workType" onclick="onSortClick('workType')">Werksoort<span class="sort-arrows" data-col="workType"><span data-dir="asc">&#9650;</span><span data-dir="desc">&#9660;</span></span></th>
+          <th class="sortable" data-col="description" onclick="onSortClick('description')">Omschrijving<span class="sort-arrows" data-col="description"><span data-dir="asc">&#9650;</span><span data-dir="desc">&#9660;</span></span></th>
+          <th class="sortable" data-col="hours" onclick="onSortClick('hours')">Aantal<span class="sort-arrows" data-col="hours"><span data-dir="asc">&#9650;</span><span data-dir="desc">&#9660;</span></span></th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr class="no-results"><td colspan="7">Uren laden...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Footer: info + paginering -->
+  <div class="table-footer">
+    <span id="entriesInfo">Showing 0 to 0 of 0 entries</span>
+    <div class="pagination" id="pagination"></div>
+  </div>
+
+  <button class="btn-verzenden" id="verzendBtn" onclick="verzendGeaccordeerd()" disabled>Verzenden</button>
 </div>
 
 <script>
@@ -244,13 +306,19 @@
   const HUBBI_GET_URL = "https://dpprconsultancy.app.n8n.cloud/webhook/get-hours";
   const HUBBI_POST_URL = "https://dpprconsultancy.app.n8n.cloud/webhook/approve-hours";
 
-  let selectedRuleId = null;
+  let allRows = [];        // platte lijst van alle urenregels (over alle medewerkers)
+  let checkedIds = new Set();
+  let searchTerm = "";
+  let sortColumn = "date";
+  let sortDir = "asc";
+  let pageSize = 10;
+  let currentPage = 1;
 
   document.addEventListener("DOMContentLoaded", () => {
     const today = new Date();
     const currentMonth = today.toISOString().substring(0, 7); // YYYY-MM
     document.getElementById("monthPicker").value = currentMonth;
-    
+
     loadHours();
   });
 
@@ -262,143 +330,283 @@
   async function loadHours() {
     const debituurId = getDebiteurId();
     const month = document.getElementById("monthPicker").value;
-    const container = document.getElementById("employeeList");
-    
+
     document.getElementById("klantNaam").innerText = `Debiteurnummer: ${debituurId}`;
-    container.innerHTML = `<p style="text-align:center; color: #64748b;">Uren ophalen voor ${month}...</p>`;
+    document.getElementById("tableBody").innerHTML = `<tr class="no-results"><td colspan="7">Uren ophalen voor ${month}...</td></tr>`;
 
     try {
       const response = await fetch(`${HUBBI_GET_URL}?debituurId=${debituurId}&month=${month}`);
       const data = await response.json();
 
-      if (!data || data.length === 0) {
-        container.innerHTML = `<p style="text-align:center; padding: 20px; color: #64748b;">Geen openstaande uren gevonden voor deze maand.</p>`;
-        return;
-      }
+      allRows = [];
+      (data || []).forEach(emp => {
+        (emp.rules || []).forEach(rule => {
+          allRows.push({
+            ruleId: rule.ruleId,
+            date: rule.date,
+            employeeName: emp.employeeName,
+            employeeId: emp.employeeId,
+            project: rule.project,
+            workType: rule.workType,
+            description: rule.description,
+            hours: rule.hours
+          });
+        });
+      });
 
-      renderEmployees(data);
+      checkedIds.clear();
+      currentPage = 1;
+      renderAll();
     } catch (err) {
       console.error(err);
-      container.innerHTML = `<p style="text-align:center; color: red;">Fout bij het laden van uren via HubBI.</p>`;
+      document.getElementById("tableBody").innerHTML = `<tr class="no-results"><td colspan="7" style="color:red;">Fout bij het laden van uren via HubBI.</td></tr>`;
     }
   }
 
-  function renderEmployees(employees) {
-    const container = document.getElementById("employeeList");
-    container.innerHTML = "";
+  function parseDateValue(value) {
+    if (!value) return 0;
+    // probeer DD-MM-YYYY
+    const dmy = /^(\d{2})-(\d{2})-(\d{4})$/.exec(value);
+    if (dmy) return new Date(`${dmy[3]}-${dmy[2]}-${dmy[1]}`).getTime();
+    const t = new Date(value).getTime();
+    return isNaN(t) ? 0 : t;
+  }
 
-    employees.forEach((emp, index) => {
-      const initials = emp.employeeName.split(' ').map(n => n[0]).join('').substring(0, 2);
-      
-      const card = document.createElement("div");
-      card.className = "employee-card";
-      card.innerHTML = `
-        <div class="employee-header" onclick="toggleTable(${index})">
-          <div class="employee-info">
-            <div class="avatar">${initials}</div>
-            <div class="employee-details">
-              <h3>${emp.employeeName}</h3>
-              <span>${emp.rules.length} urenregels in deze maand</span>
-            </div>
-          </div>
-          <div class="employee-actions" onclick="event.stopPropagation()">
-            <span style="font-weight: bold; font-size: 16px; margin-right: 12px;">${emp.totalHours.toFixed(1)} uur</span>
-            <button class="btn btn-success" onclick="approveAll('${emp.employeeId}', ${index})">Accordeer alles van ${emp.employeeName.split(' ')[0]}</button>
-          </div>
-        </div>
-        
-        <div class="table-container" id="table-${index}">
-          <table>
-            <thead>
-              <tr>
-                <th>Datum</th>
-                <th>Project</th>
-                <th>Werkzaamheid</th>
-                <th>Omschrijving</th>
-                <th>Uren</th>
-                <th>Status</th>
-                <th>Acties</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${emp.rules.map(rule => `
-                <tr id="row-${rule.ruleId}">
-                  <td>${rule.date}</td>
-                  <td>${rule.project}</td>
-                  <td>${rule.workType}</td>
-                  <td>${rule.description}</td>
-                  <td><strong>${rule.hours}</strong></td>
-                  <td><span class="status-badge badge-pending">${rule.status}</span></td>
-                  <td>
-                    <button class="btn btn-success" style="padding: 4px 8px;" onclick="updateSingleRule('${rule.ruleId}', 'approve')">✓</button>
-                    <button class="btn btn-danger" style="padding: 4px 8px;" onclick="openRejectModal('${rule.ruleId}')">✕</button>
-                  </td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      `;
-      container.appendChild(card);
+  function parseHoursValue(value) {
+    return parseFloat(String(value).replace(',', '.')) || 0;
+  }
+
+  function getFilteredSortedRows() {
+    const term = searchTerm.trim().toLowerCase();
+    let rows = allRows;
+
+    if (term) {
+      rows = rows.filter(row => {
+        const haystack = [row.date, row.employeeName, row.project, row.workType, row.description, row.hours]
+          .join(' ').toLowerCase();
+        return haystack.includes(term);
+      });
+    }
+
+    rows = rows.slice().sort((a, b) => {
+      let av, bv;
+      if (sortColumn === 'date') {
+        av = parseDateValue(a.date); bv = parseDateValue(b.date);
+      } else if (sortColumn === 'hours') {
+        av = parseHoursValue(a.hours); bv = parseHoursValue(b.hours);
+      } else {
+        av = String(a[sortColumn] || '').toLowerCase();
+        bv = String(b[sortColumn] || '').toLowerCase();
+      }
+      if (av < bv) return sortDir === 'asc' ? -1 : 1;
+      if (av > bv) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return rows;
+  }
+
+  function renderAll() {
+    const filtered = getFilteredSortedRows();
+    const totalEntries = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(totalEntries / pageSize));
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    const start = (currentPage - 1) * pageSize;
+    const pageRows = filtered.slice(start, start + pageSize);
+
+    renderTableBody(pageRows);
+    renderEntriesInfo(totalEntries, start, pageRows.length);
+    renderPagination(totalPages);
+    renderSortIndicators();
+    syncSelectAllState(pageRows);
+    updateVerzendButton();
+  }
+
+  function renderTableBody(pageRows) {
+    const tbody = document.getElementById("tableBody");
+
+    if (pageRows.length === 0) {
+      tbody.innerHTML = `<tr class="no-results"><td colspan="7">Geen urenregels gevonden.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = pageRows.map(row => `
+      <tr>
+        <td class="col-check"><input type="checkbox" data-rule-id="${row.ruleId}" ${checkedIds.has(row.ruleId) ? 'checked' : ''} onchange="onRowCheckChange('${row.ruleId}', this.checked)"></td>
+        <td>${row.date}</td>
+        <td>${row.employeeName}</td>
+        <td>${row.project}</td>
+        <td>${row.workType}</td>
+        <td class="wrap-cell">${row.description}</td>
+        <td>${row.hours}</td>
+      </tr>
+    `).join('');
+  }
+
+  function renderEntriesInfo(totalEntries, start, pageCount) {
+    const info = document.getElementById("entriesInfo");
+    if (totalEntries === 0) {
+      info.innerText = "Showing 0 to 0 of 0 entries";
+      return;
+    }
+    info.innerText = `Showing ${start + 1} to ${start + pageCount} of ${totalEntries} entries`;
+  }
+
+  function renderPagination(totalPages) {
+    const pagination = document.getElementById("pagination");
+    let html = `<button ${currentPage === 1 ? 'disabled' : ''} onclick="goToPage(${currentPage - 1})">Previous</button>`;
+
+    const pages = getPageWindow(currentPage, totalPages);
+    pages.forEach(p => {
+      if (p === '...') {
+        html += `<span class="ellipsis">&hellip;</span>`;
+      } else {
+        html += `<button class="${p === currentPage ? 'active' : ''}" onclick="goToPage(${p})">${p}</button>`;
+      }
+    });
+
+    html += `<button ${currentPage === totalPages ? 'disabled' : ''} onclick="goToPage(${currentPage + 1})">Next</button>`;
+    pagination.innerHTML = html;
+  }
+
+  function getPageWindow(current, total) {
+    const delta = 1;
+    const range = [];
+    for (let i = Math.max(1, current - delta); i <= Math.min(total, current + delta); i++) {
+      range.push(i);
+    }
+    if (range[0] > 1) {
+      if (range[0] > 2) range.unshift('...');
+      range.unshift(1);
+    }
+    if (range[range.length - 1] < total) {
+      if (range[range.length - 1] < total - 1) range.push('...');
+      range.push(total);
+    }
+    return range;
+  }
+
+  function renderSortIndicators() {
+    document.querySelectorAll('.sort-arrows').forEach(el => {
+      const col = el.getAttribute('data-col');
+      el.querySelectorAll('span').forEach(arrow => {
+        const dir = arrow.getAttribute('data-dir');
+        arrow.classList.toggle('active', col === sortColumn && dir === sortDir);
+      });
     });
   }
 
-  function toggleTable(index) {
-    const table = document.getElementById(`table-${index}`);
-    table.classList.toggle("open");
+  function syncSelectAllState(pageRows) {
+    const selectAll = document.getElementById("selectAllCheckbox");
+    if (pageRows.length === 0) {
+      selectAll.checked = false;
+      selectAll.indeterminate = false;
+      return;
+    }
+    const checkedCount = pageRows.filter(r => checkedIds.has(r.ruleId)).length;
+    selectAll.checked = checkedCount === pageRows.length;
+    selectAll.indeterminate = checkedCount > 0 && checkedCount < pageRows.length;
   }
 
-  async function updateSingleRule(ruleId, action, reason = "") {
+  function updateVerzendButton() {
+    const btn = document.getElementById("verzendBtn");
+    btn.disabled = checkedIds.size === 0;
+    btn.innerText = checkedIds.size > 0 ? `Verzenden (${checkedIds.size})` : 'Verzenden';
+  }
+
+  function onSortClick(col) {
+    if (sortColumn === col) {
+      sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortColumn = col;
+      sortDir = 'asc';
+    }
+    currentPage = 1;
+    renderAll();
+  }
+
+  function onSearchInput() {
+    searchTerm = document.getElementById("searchInput").value;
+    currentPage = 1;
+    renderAll();
+  }
+
+  function onPageSizeChange() {
+    pageSize = parseInt(document.getElementById("pageSizeSelect").value, 10);
+    currentPage = 1;
+    renderAll();
+  }
+
+  function goToPage(page) {
+    currentPage = page;
+    renderAll();
+  }
+
+  function onRowCheckChange(ruleId, checked) {
+    if (checked) checkedIds.add(ruleId);
+    else checkedIds.delete(ruleId);
+    const filtered = getFilteredSortedRows();
+    const start = (currentPage - 1) * pageSize;
+    syncSelectAllState(filtered.slice(start, start + pageSize));
+    updateVerzendButton();
+  }
+
+  function onSelectAllChange() {
+    const selectAll = document.getElementById("selectAllCheckbox");
+    const filtered = getFilteredSortedRows();
+    const start = (currentPage - 1) * pageSize;
+    const pageRows = filtered.slice(start, start + pageSize);
+
+    pageRows.forEach(row => {
+      if (selectAll.checked) checkedIds.add(row.ruleId);
+      else checkedIds.delete(row.ruleId);
+    });
+
+    renderTableBody(pageRows);
+    updateVerzendButton();
+  }
+
+  async function verzendGeaccordeerd() {
+    if (checkedIds.size === 0) return;
+    const ids = Array.from(checkedIds);
+    if (!confirm(`Weet je zeker dat je ${ids.length} urenregel(s) wilt accorderen?`)) return;
+
+    const btn = document.getElementById("verzendBtn");
+    btn.disabled = true;
+    btn.innerText = "Bezig met verzenden...";
+
+    const failed = [];
+    for (const ruleId of ids) {
+      const ok = await approveRule(ruleId);
+      if (!ok) failed.push(ruleId);
+    }
+
+    allRows = allRows.filter(row => !ids.includes(row.ruleId) || failed.includes(row.ruleId));
+    checkedIds = new Set(failed);
+
+    renderAll();
+
+    if (failed.length === 0) {
+      alert(`${ids.length} urenregel(s) succesvol geaccordeerd.`);
+    } else {
+      alert(`${ids.length - failed.length} urenregel(s) geaccordeerd. ${failed.length} regel(s) zijn mislukt, probeer het opnieuw.`);
+    }
+  }
+
+  async function approveRule(ruleId) {
     try {
       const res = await fetch(HUBBI_POST_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ruleId, action, reason })
+        body: JSON.stringify({ ruleId, action: 'approve' })
       });
-      
-      if (res.ok) {
-        const row = document.getElementById(`row-${ruleId}`);
-        if (action === 'approve') {
-          row.querySelector('.status-badge').className = 'status-badge badge-approved';
-          row.querySelector('.status-badge').innerText = 'Geaccordeerd';
-        } else {
-          row.style.opacity = '0.4';
-          row.querySelector('.status-badge').innerText = 'Afgekeurd';
-        }
-      }
+      return res.ok;
     } catch (e) {
-      alert("Er is een fout opgetreden bij het verwerken.");
+      console.error(e);
+      return false;
     }
-  }
-
-  async function approveAll(employeeId, tableIndex) {
-    const table = document.getElementById(`table-${tableIndex}`);
-    const rows = table.querySelectorAll("tbody tr");
-    
-    for (let row of rows) {
-      const ruleId = row.id.replace('row-', '');
-      await updateSingleRule(ruleId, 'approve');
-    }
-  }
-
-  function openRejectModal(ruleId) {
-    selectedRuleId = ruleId;
-    document.getElementById("rejectModal").style.display = "flex";
-  }
-
-  function closeModal() {
-    document.getElementById("rejectModal").style.display = "none";
-    document.getElementById("rejectReason").value = "";
-  }
-
-  function confirmReject() {
-    const reason = document.getElementById("rejectReason").value;
-    if (!reason) {
-      alert("Vul a.u.b. een reden in.");
-      return;
-    }
-    updateSingleRule(selectedRuleId, 'reject', reason);
-    closeModal();
   }
 </script>
 
