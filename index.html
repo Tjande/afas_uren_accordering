@@ -53,6 +53,7 @@
       display: flex;
       gap: 16px;
       align-items: center;
+      flex-wrap: wrap;
       background: var(--afas-light-blue);
       padding: 10px 16px;
       border-radius: 8px;
@@ -65,11 +66,14 @@
       color: var(--afas-blue);
     }
 
-    .filter-bar input[type="month"] {
+    .filter-bar input[type="month"],
+    .filter-bar select {
       padding: 6px 10px;
       border: 1px solid var(--border-color);
       border-radius: 6px;
+      font-family: inherit;
       font-size: 14px;
+      color: var(--text-dark);
     }
 
     /* Toolbar: entries + search */
@@ -248,10 +252,15 @@
     <span id="klantNaam" style="font-weight: 600; color: #64748b; font-size: 13px;">Klant ID: ...</span>
   </div>
 
-  <!-- Maandfilter -->
+  <!-- Maand- en weekfilter -->
   <div class="filter-bar">
     <label for="monthPicker">Selecteer Periode (Maand):</label>
     <input type="month" id="monthPicker" onchange="loadHours()">
+
+    <label for="weekFilter">Week:</label>
+    <select id="weekFilter" onchange="onWeekFilterChange()">
+      <option value="">Alle weken</option>
+    </select>
   </div>
 
   <!-- Entries + Search -->
@@ -302,13 +311,14 @@
 </div>
 
 <script>
-  // VERVANG DEZE URL'S MET JOUW EIGEN HUBBI WEBHOOK URL'S
-  const HUBBI_GET_URL = "https://dpprconsultancy.app.n8n.cloud/webhook/get-hours";
-  const HUBBI_POST_URL = "https://dpprconsultancy.app.n8n.cloud/webhook/approve-hours";
+  // VERVANG DEZE URL'S MET JOUW EIGEN N8N WEBHOOK URL'S
+  const N8N_GET_URL = "https://dpprconsultancy.app.n8n.cloud/webhook/get-hours";
+  const N8N_POST_URL = "https://dpprconsultancy.app.n8n.cloud/webhook/approve-hours";
 
   let allRows = [];        // platte lijst van alle urenregels (over alle medewerkers)
   let checkedIds = new Set();
   let searchTerm = "";
+  let selectedWeek = "";   // ISO week-key, bv. "2015-W49", leeg = alle weken
   let sortColumn = "date";
   let sortDir = "asc";
   let pageSize = 10;
@@ -335,7 +345,7 @@
     document.getElementById("tableBody").innerHTML = `<tr class="no-results"><td colspan="7">Uren ophalen voor ${month}...</td></tr>`;
 
     try {
-      const response = await fetch(`${HUBBI_GET_URL}?debituurId=${debituurId}&month=${month}`);
+      const response = await fetch(`${N8N_GET_URL}?debituurId=${debituurId}&month=${month}`);
       const data = await response.json();
 
       allRows = [];
@@ -356,10 +366,11 @@
 
       checkedIds.clear();
       currentPage = 1;
+      populateWeekFilter();
       renderAll();
     } catch (err) {
       console.error(err);
-      document.getElementById("tableBody").innerHTML = `<tr class="no-results"><td colspan="7" style="color:red;">Fout bij het laden van uren via HubBI.</td></tr>`;
+      document.getElementById("tableBody").innerHTML = `<tr class="no-results"><td colspan="7" style="color:red;">Fout bij het laden van uren.</td></tr>`;
     }
   }
 
@@ -376,9 +387,49 @@
     return parseFloat(String(value).replace(',', '.')) || 0;
   }
 
+  // ISO-8601 weeknummer: week bevat de donderdag van die week
+  function getISOWeekInfo(dateStr) {
+    const t = parseDateValue(dateStr);
+    if (!t) return null;
+    const d = new Date(t);
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
+    const week1 = new Date(d.getFullYear(), 0, 4);
+    const weekNo = 1 + Math.round(((d - week1) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
+    return { year: d.getFullYear(), week: weekNo, key: `${d.getFullYear()}-W${String(weekNo).padStart(2, '0')}` };
+  }
+
+  function populateWeekFilter() {
+    const weekSelect = document.getElementById("weekFilter");
+    const weeksMap = new Map();
+    allRows.forEach(row => {
+      const info = getISOWeekInfo(row.date);
+      if (info) weeksMap.set(info.key, info);
+    });
+    const weeks = Array.from(weeksMap.values()).sort((a, b) => a.key.localeCompare(b.key));
+
+    selectedWeek = "";
+    weekSelect.innerHTML = '<option value="">Alle weken</option>' +
+      weeks.map(w => `<option value="${w.key}">Week ${w.week} (${w.year})</option>`).join('');
+    weekSelect.value = "";
+  }
+
+  function onWeekFilterChange() {
+    selectedWeek = document.getElementById("weekFilter").value;
+    currentPage = 1;
+    renderAll();
+  }
+
   function getFilteredSortedRows() {
     const term = searchTerm.trim().toLowerCase();
     let rows = allRows;
+
+    if (selectedWeek) {
+      rows = rows.filter(row => {
+        const info = getISOWeekInfo(row.date);
+        return info && info.key === selectedWeek;
+      });
+    }
 
     if (term) {
       rows = rows.filter(row => {
@@ -597,7 +648,7 @@
 
   async function approveRule(ruleId) {
     try {
-      const res = await fetch(HUBBI_POST_URL, {
+      const res = await fetch(N8N_POST_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ruleId, action: 'approve' })
