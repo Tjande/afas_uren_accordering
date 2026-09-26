@@ -313,7 +313,10 @@
 <script>
   // VERVANG DEZE URL'S MET JOUW EIGEN N8N WEBHOOK URL'S
   const N8N_GET_URL = "https://dpprconsultancy.app.n8n.cloud/webhook/get-hours";
+  const N8N_VERIFY_URL = "https://dpprconsultancy.app.n8n.cloud/webhook/verify-session";
   const N8N_POST_URL = "https://dpprconsultancy.app.n8n.cloud/webhook/approve-hours";
+  // Moet exact overeenkomen met de "Value" van de 'Webhook API Key'-credential in n8n
+  const N8N_API_KEY = "sk_outsite_7f3a9c2e1b8d4f6a0e5c9b2d7a1f4e8c";
 
   let allRows = [];        // platte lijst van alle urenregels (over alle medewerkers)
   let checkedIds = new Set();
@@ -324,6 +327,18 @@
   let pageSize = 10;
   let currentPage = 1;
 
+  // Parameters die AFAS OutSite automatisch aan de iframe-URL toevoegt.
+  // Als deze aanwezig zijn, gebruiken we de geverifieerde AFAS-sessie i.p.v.
+  // een los (en dus vervalsbaar) debiteurnummer.
+  const afasParams = new URLSearchParams(window.location.search);
+  const afasSession = {
+    tokenurl: afasParams.get('tokenurl'),
+    code: afasParams.get('code'),
+    publickey: afasParams.get('publickey'),
+    sessionid: afasParams.get('sessionid')
+  };
+  const isAfasSession = !!(afasSession.tokenurl && afasSession.code && afasSession.publickey && afasSession.sessionid);
+
   document.addEventListener("DOMContentLoaded", () => {
     const today = new Date();
     const currentMonth = today.toISOString().substring(0, 7); // YYYY-MM
@@ -332,20 +347,30 @@
     loadHours();
   });
 
-  function getDebiteurId() {
-    const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get('debituurId') || '10023';
-  }
-
   async function loadHours() {
-    const debituurId = getDebiteurId();
     const month = document.getElementById("monthPicker").value;
-
-    document.getElementById("klantNaam").innerText = `Debiteurnummer: ${debituurId}`;
     document.getElementById("tableBody").innerHTML = `<tr class="no-results"><td colspan="7">Uren ophalen voor ${month}...</td></tr>`;
 
     try {
-      const response = await fetch(`${N8N_GET_URL}?debituurId=${debituurId}&month=${month}`);
+      let response;
+      if (isAfasSession) {
+        // Veilige flow: n8n verifieert bij AFAS zelf wie is ingelogd
+        const params = new URLSearchParams({ ...afasSession, month });
+        response = await fetch(`${N8N_VERIFY_URL}?${params.toString()}`, {
+          headers: { "X-Api-Key": N8N_API_KEY }
+        });
+      } else {
+        // Fallback: losstaand testen buiten OutSite om, met handmatig debiteurnummer
+        const debituurId = afasParams.get('debituurId') || '10023';
+        document.getElementById("klantNaam").innerText = `Debiteurnummer: ${debituurId}`;
+        response = await fetch(`${N8N_GET_URL}?debituurId=${debituurId}&month=${month}`, {
+          headers: { "X-Api-Key": N8N_API_KEY }
+        });
+      }
+
+      if (!response.ok) {
+        throw new Error(`Serverfout (${response.status})`);
+      }
       const data = await response.json();
 
       allRows = [];
@@ -353,11 +378,11 @@
         (emp.rules || []).forEach(rule => {
           allRows.push({
             ruleId: rule.ruleId,
-            date: rule.date,
+            date: (rule.year && rule.period) ? `${String(rule.period).padStart(2, '0')}-${rule.year}` : '',
             employeeName: emp.employeeName,
             employeeId: emp.employeeId,
             project: rule.project,
-            workType: rule.workType,
+            workType: rule.itemCode || '',
             description: rule.description,
             hours: rule.hours
           });
@@ -650,7 +675,10 @@
     try {
       const res = await fetch(N8N_POST_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Api-Key": N8N_API_KEY
+        },
         body: JSON.stringify({ ruleId, action: 'approve' })
       });
       return res.ok;
