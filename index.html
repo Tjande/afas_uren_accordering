@@ -249,7 +249,6 @@
 <div class="container">
   <div class="header">
     <h2>&#9998; Uren accorderen &amp; gereed melden</h2>
-    <span id="klantNaam" style="font-weight: 600; color: #64748b; font-size: 13px;">Klant ID: ...</span>
   </div>
 
   <!-- Maand- en weekfilter -->
@@ -362,7 +361,7 @@
       } else {
         // Fallback: losstaand testen buiten OutSite om, met handmatig debiteurnummer
         const debituurId = afasParams.get('debituurId') || '10023';
-        document.getElementById("klantNaam").innerText = `Debiteurnummer: ${debituurId}`;
+        console.log(`Testmodus \u2014 debiteurnummer: ${debituurId}`);
         response = await fetch(`${N8N_GET_URL}?debituurId=${debituurId}&month=${month}`, {
           headers: { "X-Api-Key": N8N_API_KEY }
         });
