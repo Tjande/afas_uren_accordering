@@ -378,7 +378,7 @@
         (emp.rules || []).forEach(rule => {
           allRows.push({
             ruleId: rule.ruleId,
-            date: (rule.year && rule.period) ? `${String(rule.period).padStart(2, '0')}-${rule.year}` : '',
+            date: rule.date || ((rule.year && rule.period) ? `${String(rule.period).padStart(2, '0')}-${rule.year}` : ''),
             employeeName: emp.employeeName,
             employeeId: emp.employeeId,
             project: rule.project,
