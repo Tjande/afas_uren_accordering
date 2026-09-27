@@ -378,6 +378,7 @@
           allRows.push({
             ruleId: rule.ruleId,
             date: rule.date || ((rule.year && rule.period) ? `${String(rule.period).padStart(2, '0')}-${rule.year}` : ''),
+            dateRaw: rule.dateRaw || '',
             employeeName: emp.employeeName,
             employeeId: emp.employeeId,
             project: rule.project,
@@ -672,13 +673,19 @@
 
   async function approveRule(ruleId) {
     try {
+      const row = allRows.find(r => r.ruleId === ruleId);
       const res = await fetch(N8N_POST_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "X-Api-Key": N8N_API_KEY
         },
-        body: JSON.stringify({ ruleId, action: 'approve' })
+        body: JSON.stringify({
+          ruleId,
+          action: 'approve',
+          dateRaw: row ? row.dateRaw : '',
+          itemCode: row ? row.workType : ''
+        })
       });
       return res.ok;
     } catch (e) {
