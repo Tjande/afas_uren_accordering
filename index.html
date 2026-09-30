@@ -794,8 +794,14 @@
       alert('Er ging iets mis bij het verwerken, probeer het opnieuw.');
     }
 
-    // Ververst vanaf de bron: verwerkte regels verdwijnen, mislukte blijven staan.
-    await loadHours();
+    // Let op: we laden de uren hier bewust NIET automatisch opnieuw \u2014 de
+    // eenmalige AFAS-code van deze paginasessie is dan al verbruikt, dus een
+    // nieuwe aanroep zou altijd mislukken. Ververs de pagina handmatig (in
+    // OutSite, zodat er een verse code komt) om de actuele status te zien.
+    rowActions = {};
+    renderAll();
+    btn.innerText = "Verzenden";
+    updateVerzendButton();
   }
 </script>
 
