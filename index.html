@@ -264,6 +264,90 @@
       opacity: 0.5;
       cursor: not-allowed;
     }
+    /* Eigen meldingen i.p.v. browser alert()/confirm() */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.visible {
+      display: flex;
+    }
+    .modal-box {
+      background: #ffffff;
+      border-radius: 10px;
+      max-width: 420px;
+      width: 90%;
+      padding: 24px;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.2);
+    }
+    .modal-box p {
+      margin: 0 0 20px 0;
+      color: var(--text-dark);
+      line-height: 1.5;
+      white-space: pre-line;
+    }
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+    .modal-actions button {
+      padding: 8px 18px;
+      border-radius: 6px;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .modal-btn-primary {
+      background: var(--afas-blue);
+      color: #fff;
+    }
+    .modal-btn-primary:hover {
+      background: #003d7a;
+    }
+    .modal-btn-secondary {
+      background: #e2e8f0;
+      color: var(--text-dark);
+    }
+    .modal-btn-secondary:hover {
+      background: #cbd5e1;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #1e293b;
+      color: #fff;
+      padding: 14px 22px;
+      border-radius: 8px;
+      font-size: 14px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+      z-index: 1100;
+      opacity: 0;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      pointer-events: none;
+      max-width: 90%;
+      text-align: center;
+      white-space: pre-line;
+    }
+    .toast.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    .toast.toast-success {
+      background: #15803d;
+    }
+    .toast.toast-error {
+      background: #b91c1c;
+    }
   </style>
 </head>
 <body>
@@ -348,6 +432,41 @@
   const N8N_POST_URL = "https://dpprconsultancy.app.n8n.cloud/webhook/approve-hours";
   // Moet exact overeenkomen met de "Value" van de 'Webhook API Key'-credential in n8n
   const N8N_API_KEY = "sk_outsite_7f3a9c2e1b8d4f6a0e5c9b2d7a1f4e8c";
+
+  // --- Eigen meldingen, i.p.v. de kale browser alert()/confirm() ---
+  let toastTimer = null;
+  function showToast(message, type) {
+    const el = document.getElementById("toast");
+    el.textContent = message;
+    el.className = "toast visible" + (type ? ` toast-${type}` : "");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      el.classList.remove("visible");
+    }, 4000);
+  }
+
+  function showConfirm(message) {
+    return new Promise((resolve) => {
+      const overlay = document.getElementById("confirmOverlay");
+      document.getElementById("confirmMessage").textContent = message;
+      overlay.classList.add("visible");
+
+      const okBtn = document.getElementById("confirmOkBtn");
+      const cancelBtn = document.getElementById("confirmCancelBtn");
+
+      function cleanup(result) {
+        overlay.classList.remove("visible");
+        okBtn.removeEventListener("click", onOk);
+        cancelBtn.removeEventListener("click", onCancel);
+        resolve(result);
+      }
+      function onOk() { cleanup(true); }
+      function onCancel() { cleanup(false); }
+
+      okBtn.addEventListener("click", onOk);
+      cancelBtn.addEventListener("click", onCancel);
+    });
+  }
 
   let allRows = [];        // platte lijst van alle open urenregels (over alle medewerkers)
   let rowActions = {};     // ruleId -> { action: 'approve'|'reject'|null, reason: '' }
@@ -742,14 +861,15 @@
 
     const openZonderKeuze = allRows.length - chosen.length;
     if (openZonderKeuze > 0) {
-      const doorgaan = confirm(`${openZonderKeuze} regel(s) zijn niet aangevinkt en blijven open. Wil je doorgaan met alleen de ${chosen.length} aangevinkte regel(s)?`);
+      const doorgaan = await showConfirm(`${openZonderKeuze} regel(s) zijn niet aangevinkt en blijven open. Wil je doorgaan met alleen de ${chosen.length} aangevinkte regel(s)?`);
       if (!doorgaan) return;
     } else {
-      if (!confirm(`Weet je zeker dat je ${chosen.length} urenregel(s) wilt verwerken?`)) return;
+      const doorgaan = await showConfirm(`Weet je zeker dat je ${chosen.length} urenregel(s) wilt verwerken?`);
+      if (!doorgaan) return;
     }
 
     if (!sessionToken) {
-      alert('Geen geldig sessietoken \u2014 herlaad de pagina en probeer opnieuw.');
+      showToast('Geen geldig sessietoken \u2014 herlaad de pagina en probeer opnieuw.', 'error');
       return;
     }
 
@@ -783,15 +903,15 @@
       const data = await res.json().catch(() => null);
 
       if (data && typeof data.message === 'string') {
-        alert(data.message);
+        showToast(data.message, (data.success === false || data.failed > 0) ? 'error' : 'success');
       } else if (res.ok) {
-        alert('Verwerkt.');
+        showToast('Verwerkt.', 'success');
       } else {
-        alert('Er ging iets mis bij het verwerken, probeer het opnieuw.');
+        showToast('Er ging iets mis bij het verwerken, probeer het opnieuw.', 'error');
       }
     } catch (e) {
       console.error(e);
-      alert('Er ging iets mis bij het verwerken, probeer het opnieuw.');
+      showToast('Er ging iets mis bij het verwerken, probeer het opnieuw.', 'error');
     }
 
     // Let op: we laden de uren hier bewust NIET automatisch opnieuw \u2014 de
@@ -804,6 +924,20 @@
     updateVerzendButton();
   }
 </script>
+
+<!-- Eigen bevestigingsvenster i.p.v. browser confirm() -->
+<div class="modal-overlay" id="confirmOverlay">
+  <div class="modal-box">
+    <p id="confirmMessage"></p>
+    <div class="modal-actions">
+      <button class="modal-btn-secondary" id="confirmCancelBtn">Annuleren</button>
+      <button class="modal-btn-primary" id="confirmOkBtn">Doorgaan</button>
+    </div>
+  </div>
+</div>
+
+<!-- Eigen melding i.p.v. browser alert() -->
+<div class="toast" id="toast"></div>
 
 </body>
 </html>
