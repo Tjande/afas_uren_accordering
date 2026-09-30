@@ -883,7 +883,9 @@
         ruleId: row.ruleId,
         action: state.action,
         dateRaw: row.dateRaw,
-        itemCode: row.workType
+        itemCode: row.workType,
+        employeeName: row.employeeName,
+        date: row.date
       };
       if (state.action === 'reject' && state.reason) {
         item.reason = state.reason;
