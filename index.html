@@ -149,8 +149,17 @@
     }
 
     th.col-check, td.col-check {
-      width: 36px;
-      text-align: center;
+      width: 150px;
+      text-align: left;
+      font-size: 12px;
+    }
+
+    .reject-reason {
+      width: 100%;
+      margin-top: 4px;
+      padding: 2px 4px;
+      font-size: 12px;
+      box-sizing: border-box;
     }
 
     tbody tr:hover {
@@ -251,16 +260,24 @@
     <h2>&#9998; Uren accorderen &amp; gereed melden</h2>
   </div>
 
+  <!-- Getoond wanneer deze debiteur geen externe goedkeuring mag doen -->
+  <div id="accessDenied" style="display:none; padding: 24px; text-align: center; color: #64748b;"></div>
+
+  <div id="mainContent">
+
   <!-- Maand- en weekfilter -->
   <div class="filter-bar">
     <label for="monthPicker">Selecteer Periode (Maand):</label>
     <input type="month" id="monthPicker" onchange="loadHours()">
 
-    <label for="weekFilter">Week:</label>
-    <select id="weekFilter" onchange="onWeekFilterChange()">
-      <option value="">Alle weken</option>
-    </select>
+    <span id="weekFilterWrap">
+      <label for="weekFilter">Week:</label>
+      <select id="weekFilter" onchange="onWeekFilterChange()">
+        <option value="">Alle weken</option>
+      </select>
+    </span>
   </div>
+
 
   <!-- Entries + Search -->
   <div class="toolbar">
@@ -285,7 +302,7 @@
     <table>
       <thead>
         <tr>
-          <th class="col-check"><input type="checkbox" id="selectAllCheckbox" onchange="onSelectAllChange()"></th>
+          <th class="col-check"><input type="checkbox" id="selectAllCheckbox" onchange="onSelectAllChange()" title="Alles goedkeuren"></th>
           <th class="sortable" data-col="date" onclick="onSortClick('date')">Datum<span class="sort-arrows" data-col="date"><span data-dir="asc">&#9650;</span><span data-dir="desc">&#9660;</span></span></th>
           <th class="sortable" data-col="employeeName" onclick="onSortClick('employeeName')">Medewerker<span class="sort-arrows" data-col="employeeName"><span data-dir="asc">&#9650;</span><span data-dir="desc">&#9660;</span></span></th>
           <th class="sortable" data-col="project" onclick="onSortClick('project')">Project<span class="sort-arrows" data-col="project"><span data-dir="asc">&#9650;</span><span data-dir="desc">&#9660;</span></span></th>
@@ -307,6 +324,8 @@
   </div>
 
   <button class="btn-verzenden" id="verzendBtn" onclick="verzendGeaccordeerd()" disabled>Verzenden</button>
+
+  </div><!-- /mainContent -->
 </div>
 
 <script>
@@ -317,8 +336,10 @@
   // Moet exact overeenkomen met de "Value" van de 'Webhook API Key'-credential in n8n
   const N8N_API_KEY = "sk_outsite_7f3a9c2e1b8d4f6a0e5c9b2d7a1f4e8c";
 
-  let allRows = [];        // platte lijst van alle urenregels (over alle medewerkers)
-  let checkedIds = new Set();
+  let allRows = [];        // platte lijst van alle open urenregels (over alle medewerkers)
+  let rowActions = {};     // ruleId -> { action: 'approve'|'reject'|null, reason: '' }
+  let sessionToken = null; // sessietoken van n8n, nodig bij het accorderen
+  let frequency = 'maand'; // 'week' of 'maand', bepaalt welke filter zichtbaar is
   let searchTerm = "";
   let selectedWeek = "";   // ISO week-key, bv. "2015-W49", leeg = alle weken
   let sortColumn = "date";
@@ -360,6 +381,7 @@
         });
       } else {
         // Fallback: losstaand testen buiten OutSite om, met handmatig debiteurnummer
+        // (alleen bekijken; accorderen vereist een sessietoken en werkt hier niet)
         const debituurId = afasParams.get('debituurId') || '10023';
         console.log(`Testmodus \u2014 debiteurnummer: ${debituurId}`);
         response = await fetch(`${N8N_GET_URL}?debituurId=${debituurId}&month=${month}`, {
@@ -372,8 +394,31 @@
       }
       const data = await response.json();
 
+      // Oude, platte-lijst-vorm (testmodus) vs nieuwe vorm ({access, frequency, sessionToken, employees})
+      const isWrapped = data && !Array.isArray(data) && typeof data === 'object';
+      const access = isWrapped ? (data.access !== false) : true;
+      const employeesData = isWrapped ? (data.employees || []) : (data || []);
+
+      if (!access) {
+        document.getElementById("mainContent").style.display = "none";
+        const denied = document.getElementById("accessDenied");
+        denied.style.display = "block";
+        denied.innerText = data.message || "Goedkeuring is niet beschikbaar voor uw organisatie.";
+        return;
+      }
+
+      document.getElementById("mainContent").style.display = "";
+      document.getElementById("accessDenied").style.display = "none";
+
+      frequency = isWrapped ? (data.frequency || 'maand') : 'maand';
+      sessionToken = isWrapped ? (data.sessionToken || null) : null;
+      document.getElementById("weekFilterWrap").style.display = (frequency === 'maand') ? 'none' : '';
+      if (frequency === 'maand') {
+        selectedWeek = "";
+      }
+
       allRows = [];
-      (data || []).forEach(emp => {
+      employeesData.forEach(emp => {
         (emp.rules || []).forEach(rule => {
           allRows.push({
             ruleId: rule.ruleId,
@@ -389,7 +434,7 @@
         });
       });
 
-      checkedIds.clear();
+      rowActions = {};
       currentPage = 1;
       populateWeekFilter();
       renderAll();
@@ -504,13 +549,26 @@
     const tbody = document.getElementById("tableBody");
 
     if (pageRows.length === 0) {
-      tbody.innerHTML = `<tr class="no-results"><td colspan="7">Geen urenregels gevonden.</td></tr>`;
+      if (allRows.length === 0) {
+        tbody.innerHTML = `<tr class="no-results"><td colspan="7">Je bent helemaal bij. Er zijn geen uren om te accorderen.</td></tr>`;
+      } else {
+        tbody.innerHTML = `<tr class="no-results"><td colspan="7">Geen urenregels gevonden.</td></tr>`;
+      }
       return;
     }
 
-    tbody.innerHTML = pageRows.map(row => `
+    tbody.innerHTML = pageRows.map(row => {
+      const state = rowActions[row.ruleId] || { action: null, reason: '' };
+      const reasonBox = state.action === 'reject'
+        ? `<br><input type="text" class="reject-reason" placeholder="Toelichting (optioneel)" value="${(state.reason || '').replace(/"/g, '&quot;')}" oninput="onReasonChange('${row.ruleId}', this.value)">`
+        : '';
+      return `
       <tr>
-        <td class="col-check"><input type="checkbox" data-rule-id="${row.ruleId}" ${checkedIds.has(row.ruleId) ? 'checked' : ''} onchange="onRowCheckChange('${row.ruleId}', this.checked)"></td>
+        <td class="col-check">
+          <label><input type="checkbox" ${state.action === 'approve' ? 'checked' : ''} onchange="onRowCheckChange('${row.ruleId}', 'approve', this.checked)"> Akkoord</label><br>
+          <label><input type="checkbox" ${state.action === 'reject' ? 'checked' : ''} onchange="onRowCheckChange('${row.ruleId}', 'reject', this.checked)"> Afkeuren</label>
+          ${reasonBox}
+        </td>
         <td>${row.date}</td>
         <td>${row.employeeName}</td>
         <td>${row.project}</td>
@@ -518,7 +576,8 @@
         <td class="wrap-cell">${row.description}</td>
         <td>${row.hours}</td>
       </tr>
-    `).join('');
+    `;
+    }).join('');
   }
 
   function renderEntriesInfo(totalEntries, start, pageCount) {
@@ -581,15 +640,20 @@
       selectAll.indeterminate = false;
       return;
     }
-    const checkedCount = pageRows.filter(r => checkedIds.has(r.ruleId)).length;
-    selectAll.checked = checkedCount === pageRows.length;
-    selectAll.indeterminate = checkedCount > 0 && checkedCount < pageRows.length;
+    const approvedCount = pageRows.filter(r => rowActions[r.ruleId] && rowActions[r.ruleId].action === 'approve').length;
+    selectAll.checked = approvedCount === pageRows.length;
+    selectAll.indeterminate = approvedCount > 0 && approvedCount < pageRows.length;
+  }
+
+  function countChosen() {
+    return Object.values(rowActions).filter(a => a && a.action).length;
   }
 
   function updateVerzendButton() {
     const btn = document.getElementById("verzendBtn");
-    btn.disabled = checkedIds.size === 0;
-    btn.innerText = checkedIds.size > 0 ? `Verzenden (${checkedIds.size})` : 'Verzenden';
+    const count = countChosen();
+    btn.disabled = count === 0;
+    btn.innerText = count > 0 ? `Verzenden (${count})` : 'Verzenden';
   }
 
   function onSortClick(col) {
@@ -620,13 +684,23 @@
     renderAll();
   }
 
-  function onRowCheckChange(ruleId, checked) {
-    if (checked) checkedIds.add(ruleId);
-    else checkedIds.delete(ruleId);
+  function onRowCheckChange(ruleId, type, checked) {
+    if (!rowActions[ruleId]) rowActions[ruleId] = { action: null, reason: '' };
+    if (checked) {
+      rowActions[ruleId].action = type; // 'approve' en 'afkeuren' sluiten elkaar uit
+    } else if (rowActions[ruleId].action === type) {
+      rowActions[ruleId].action = null;
+    }
     const filtered = getFilteredSortedRows();
     const start = (currentPage - 1) * pageSize;
+    renderTableBody(filtered.slice(start, start + pageSize));
     syncSelectAllState(filtered.slice(start, start + pageSize));
     updateVerzendButton();
+  }
+
+  function onReasonChange(ruleId, value) {
+    if (!rowActions[ruleId]) rowActions[ruleId] = { action: 'reject', reason: '' };
+    rowActions[ruleId].reason = value;
   }
 
   function onSelectAllChange() {
@@ -636,8 +710,11 @@
     const pageRows = filtered.slice(start, start + pageSize);
 
     pageRows.forEach(row => {
-      if (selectAll.checked) checkedIds.add(row.ruleId);
-      else checkedIds.delete(row.ruleId);
+      if (selectAll.checked) {
+        rowActions[row.ruleId] = { action: 'approve', reason: '' };
+      } else if (rowActions[row.ruleId] && rowActions[row.ruleId].action === 'approve') {
+        rowActions[row.ruleId].action = null;
+      }
     });
 
     renderTableBody(pageRows);
@@ -645,53 +722,65 @@
   }
 
   async function verzendGeaccordeerd() {
-    if (checkedIds.size === 0) return;
-    const ids = Array.from(checkedIds);
-    if (!confirm(`Weet je zeker dat je ${ids.length} urenregel(s) wilt accorderen?`)) return;
+    const chosen = allRows.filter(r => rowActions[r.ruleId] && rowActions[r.ruleId].action);
+    if (chosen.length === 0) return;
+
+    const openZonderKeuze = allRows.length - chosen.length;
+    if (openZonderKeuze > 0) {
+      const doorgaan = confirm(`${openZonderKeuze} regel(s) zijn niet aangevinkt en blijven open. Wil je doorgaan met alleen de ${chosen.length} aangevinkte regel(s)?`);
+      if (!doorgaan) return;
+    } else {
+      if (!confirm(`Weet je zeker dat je ${chosen.length} urenregel(s) wilt verwerken?`)) return;
+    }
+
+    if (!sessionToken) {
+      alert('Geen geldig sessietoken \u2014 herlaad de pagina en probeer opnieuw.');
+      return;
+    }
 
     const btn = document.getElementById("verzendBtn");
     btn.disabled = true;
     btn.innerText = "Bezig met verzenden...";
 
-    const failed = [];
-    for (const ruleId of ids) {
-      const ok = await approveRule(ruleId);
-      if (!ok) failed.push(ruleId);
-    }
+    const items = chosen.map(row => {
+      const state = rowActions[row.ruleId];
+      const item = {
+        ruleId: row.ruleId,
+        action: state.action,
+        dateRaw: row.dateRaw,
+        itemCode: row.workType
+      };
+      if (state.action === 'reject' && state.reason) {
+        item.reason = state.reason;
+      }
+      return item;
+    });
 
-    allRows = allRows.filter(row => !ids.includes(row.ruleId) || failed.includes(row.ruleId));
-    checkedIds = new Set(failed);
-
-    renderAll();
-
-    if (failed.length === 0) {
-      alert(`${ids.length} urenregel(s) succesvol geaccordeerd.`);
-    } else {
-      alert(`${ids.length - failed.length} urenregel(s) geaccordeerd. ${failed.length} regel(s) zijn mislukt, probeer het opnieuw.`);
-    }
-  }
-
-  async function approveRule(ruleId) {
     try {
-      const row = allRows.find(r => r.ruleId === ruleId);
       const res = await fetch(N8N_POST_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "X-Api-Key": N8N_API_KEY
         },
-        body: JSON.stringify({
-          ruleId,
-          action: 'approve',
-          dateRaw: row ? row.dateRaw : '',
-          itemCode: row ? row.workType : ''
-        })
+        body: JSON.stringify({ sessionToken, items })
       });
-      return res.ok;
+      const data = await res.json().catch(() => null);
+
+      if (data && typeof data.message === 'string') {
+        alert(data.message);
+      } else if (res.ok) {
+        alert('Verwerkt.');
+      } else {
+        alert('Er ging iets mis bij het verwerken, probeer het opnieuw.');
+      }
     } catch (e) {
       console.error(e);
-      return false;
+      alert('Er ging iets mis bij het verwerken, probeer het opnieuw.');
     }
+
+    // Ververst vanaf de bron: verwerkte regels verdwijnen, mislukte blijven staan.
+    await loadHours();
   }
 </script>
 
