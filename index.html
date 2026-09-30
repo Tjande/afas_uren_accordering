@@ -427,7 +427,6 @@
 
 <script>
   // VERVANG DEZE URL'S MET JOUW EIGEN N8N WEBHOOK URL'S
-  const N8N_GET_URL = "https://dpprconsultancy.app.n8n.cloud/webhook/get-hours";
   const N8N_VERIFY_URL = "https://dpprconsultancy.app.n8n.cloud/webhook/verify-session";
   const N8N_POST_URL = "https://dpprconsultancy.app.n8n.cloud/webhook/approve-hours";
   // Moet exact overeenkomen met de "Value" van de 'Webhook API Key'-credential in n8n
@@ -500,36 +499,32 @@
   });
 
   async function loadHours() {
+    if (!isAfasSession) {
+      // Deze pagina is niet vanuit AFAS OutSite geopend (geen sessieparameters aanwezig).
+      document.getElementById("mainContent").style.display = "none";
+      const denied = document.getElementById("accessDenied");
+      denied.style.display = "block";
+      denied.innerText = "Deze pagina moet via AFAS OutSite geopend worden.";
+      return;
+    }
+
     const month = document.getElementById("monthPicker").value;
     document.getElementById("tableBody").innerHTML = `<tr class="no-results"><td colspan="7">Uren ophalen voor ${month}...</td></tr>`;
 
     try {
-      let response;
-      if (isAfasSession) {
-        // Veilige flow: n8n verifieert bij AFAS zelf wie is ingelogd
-        const params = new URLSearchParams({ ...afasSession, month });
-        response = await fetch(`${N8N_VERIFY_URL}?${params.toString()}`, {
-          headers: { "X-Api-Key": N8N_API_KEY }
-        });
-      } else {
-        // Fallback: losstaand testen buiten OutSite om, met handmatig debiteurnummer
-        // (alleen bekijken; accorderen vereist een sessietoken en werkt hier niet)
-        const debituurId = afasParams.get('debituurId') || '10023';
-        console.log(`Testmodus \u2014 debiteurnummer: ${debituurId}`);
-        response = await fetch(`${N8N_GET_URL}?debituurId=${debituurId}&month=${month}`, {
-          headers: { "X-Api-Key": N8N_API_KEY }
-        });
-      }
+      // Veilige flow: n8n verifieert bij AFAS zelf wie is ingelogd
+      const params = new URLSearchParams({ ...afasSession, month });
+      const response = await fetch(`${N8N_VERIFY_URL}?${params.toString()}`, {
+        headers: { "X-Api-Key": N8N_API_KEY }
+      });
 
       if (!response.ok) {
         throw new Error(`Serverfout (${response.status})`);
       }
       const data = await response.json();
 
-      // Oude, platte-lijst-vorm (testmodus) vs nieuwe vorm ({access, frequency, sessionToken, employees})
-      const isWrapped = data && !Array.isArray(data) && typeof data === 'object';
-      const access = isWrapped ? (data.access !== false) : true;
-      const employeesData = isWrapped ? (data.employees || []) : (data || []);
+      const access = data.access !== false;
+      const employeesData = data.employees || [];
 
       if (!access) {
         document.getElementById("mainContent").style.display = "none";
@@ -542,8 +537,8 @@
       document.getElementById("mainContent").style.display = "";
       document.getElementById("accessDenied").style.display = "none";
 
-      frequency = isWrapped ? (data.frequency || 'maand') : 'maand';
-      sessionToken = isWrapped ? (data.sessionToken || null) : null;
+      frequency = data.frequency || 'maand';
+      sessionToken = data.sessionToken || null;
       document.getElementById("weekFilterWrap").style.display = (frequency === 'maand') ? 'none' : '';
       if (frequency === 'maand') {
         selectedWeek = "";
