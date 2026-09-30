@@ -149,9 +149,22 @@
     }
 
     th.col-check, td.col-check {
-      width: 150px;
+      width: 190px;
       text-align: left;
       font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .approve-reject-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .approve-reject-row label {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      white-space: nowrap;
     }
 
     .reject-reason {
@@ -565,8 +578,10 @@
       return `
       <tr>
         <td class="col-check">
-          <label><input type="checkbox" ${state.action === 'approve' ? 'checked' : ''} onchange="onRowCheckChange('${row.ruleId}', 'approve', this.checked)"> Akkoord</label><br>
-          <label><input type="checkbox" ${state.action === 'reject' ? 'checked' : ''} onchange="onRowCheckChange('${row.ruleId}', 'reject', this.checked)"> Afkeuren</label>
+          <div class="approve-reject-row">
+            <label><input type="checkbox" ${state.action === 'approve' ? 'checked' : ''} onchange="onRowCheckChange('${row.ruleId}', 'approve', this.checked)"> Akkoord</label>
+            <label><input type="checkbox" ${state.action === 'reject' ? 'checked' : ''} onchange="onRowCheckChange('${row.ruleId}', 'reject', this.checked)"> Afkeuren</label>
+          </div>
           ${reasonBox}
         </td>
         <td>${row.date}</td>
