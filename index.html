@@ -365,7 +365,7 @@
   <!-- Maand- en weekfilter -->
   <div class="filter-bar">
     <label for="monthPicker">Selecteer Periode (Maand):</label>
-    <input type="month" id="monthPicker" onchange="loadHours()">
+    <input type="month" id="monthPicker" onchange="onMonthFilterChange()">
 
     <span id="weekFilterWrap">
       <label for="weekFilter">Week:</label>
@@ -464,6 +464,7 @@
   let frequency = 'maand'; // 'week' of 'maand', bepaalt welke filter zichtbaar is
   let searchTerm = "";
   let selectedWeek = "";   // ISO week-key, bv. "2015-W49", leeg = alle weken
+  let selectedMonth = "";  // "YYYY-MM", client-side filter (geen nieuwe serveraanroep)
   let sortColumn = "date";
   let sortDir = "asc";
   let pageSize = 10;
@@ -482,9 +483,12 @@
   const isAfasSession = !!(afasSession.tokenurl && afasSession.code && afasSession.publickey && afasSession.sessionid);
 
   document.addEventListener("DOMContentLoaded", () => {
+    // Standaard de vorige maand tonen (uren worden doorgaans een maand later verloond).
     const today = new Date();
-    const currentMonth = today.toISOString().substring(0, 7); // YYYY-MM
-    document.getElementById("monthPicker").value = currentMonth;
+    const prevMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const defaultMonth = prevMonth.toISOString().substring(0, 7); // YYYY-MM
+    document.getElementById("monthPicker").value = defaultMonth;
+    selectedMonth = defaultMonth;
 
     loadHours();
   });
@@ -499,12 +503,13 @@
       return;
     }
 
-    const month = document.getElementById("monthPicker").value;
-    document.getElementById("tableBody").innerHTML = `<tr class="no-results"><td colspan="7">Uren ophalen voor ${month}...</td></tr>`;
+    document.getElementById("tableBody").innerHTML = `<tr class="no-results"><td colspan="7">Uren ophalen...</td></tr>`;
 
     try {
-      // Veilige flow: n8n verifieert bij AFAS zelf wie is ingelogd
-      const params = new URLSearchParams({ ...afasSession, month });
+      // Veilige flow: n8n verifieert bij AFAS zelf wie is ingelogd.
+      // Haalt in \u00e9\u00e9n keer ALLE openstaande regels op; de maand/week-keuze
+      // filtert daarna alleen nog lokaal in de browser (zie onMonthFilterChange).
+      const params = new URLSearchParams({ ...afasSession });
       const response = await fetch(`${N8N_VERIFY_URL}?${params.toString()}`, {
         headers: { "X-Api-Key": N8N_API_KEY }
       });
@@ -590,7 +595,7 @@
   function populateWeekFilter() {
     const weekSelect = document.getElementById("weekFilter");
     const weeksMap = new Map();
-    allRows.forEach(row => {
+    allRows.filter(rowMatchesSelectedMonth).forEach(row => {
       const info = getISOWeekInfo(row.date);
       if (info) weeksMap.set(info.key, info);
     });
@@ -602,15 +607,28 @@
     weekSelect.value = "";
   }
 
+  function onMonthFilterChange() {
+    selectedMonth = document.getElementById("monthPicker").value;
+    selectedWeek = "";
+    currentPage = 1;
+    populateWeekFilter();
+    renderAll();
+  }
+
   function onWeekFilterChange() {
     selectedWeek = document.getElementById("weekFilter").value;
     currentPage = 1;
     renderAll();
   }
 
+  function rowMatchesSelectedMonth(row) {
+    if (!selectedMonth || !row.dateRaw) return true;
+    return row.dateRaw.substring(0, 7) === selectedMonth;
+  }
+
   function getFilteredSortedRows() {
     const term = searchTerm.trim().toLowerCase();
-    let rows = allRows;
+    let rows = allRows.filter(rowMatchesSelectedMonth);
 
     if (selectedWeek) {
       rows = rows.filter(row => {
